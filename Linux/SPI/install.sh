@@ -3,7 +3,6 @@
 #module="task_device"
 #device="task_device"
 
-
 /sbin/insmod ./spimod.ko 
 
 #rm -f /dev/${device}

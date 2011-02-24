@@ -2,7 +2,7 @@
 *	This code is strongly coupled with Linux main line code and uses much
 *	from other spi master drivers. All kernel style comments and GPL links
 *       will be added soon. Also "title"-style comments will be used in project.
-*
+*	
 **/
 
 

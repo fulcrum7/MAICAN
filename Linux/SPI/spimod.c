@@ -80,6 +80,9 @@ static void spi_kontron_attach(struct parport *p)
 		printk(KERN_WARNING
 			 "%s: spi master isn't allocated \n",
 			 DRVNAME);
+		printk(KERN_WARNING
+			 "%s: returns %d \n",
+			 DRVNAME,status);
 		return;
 	}
 	pp = spi_master_get_devdata(master);
@@ -105,23 +108,48 @@ static void spi_kontron_attach(struct parport *p)
 	if (!pd)
 	{
 		status = -ENOMEM;
-		goto out_free_master;
+		(void) spi_master_put(master);
+		printk(KERN_WARNING
+			 "%s: can't register parport device \n",
+			 DRVNAME);
+		printk(KERN_WARNING
+			 "%s: returns %d \n",
+			 DRVNAME,status);
+		return;	 
 	}
 	pp->pd = pd;
 
 	status = parport_claim(pd);
 	if (status < 0)
-		goto out_parport_unreg;
+	{
+		printk(KERN_WARNING
+			 "%s: no access to parport \n",
+			 DRVNAME);
+		printk(KERN_WARNING
+			 "%s: returns %d \n",
+			 DRVNAME,status);
+		parport_unregister_device(pd);
+		(void) spi_master_put(master);
+		return;
+	}	
 
 	/*
 	 * Start SPI ...
 	 */
 	status = spi_bitbang_start(&pp->bitbang);
-	if (status < 0) {
+	if (status < 0)
+	{
 		printk(KERN_WARNING
 			"%s: spi_bitbang_start failed with status %d\n",
 			DRVNAME, status);
-		goto out_off_and_release;
+		
+		/* power down */
+		parport_write_data(pp->port, 0);
+		mdelay(10);
+		parport_release(pp->pd);
+		parport_unregister_device(pd);
+		(void) spi_master_put(master);
+		return;
 	}
 
 	/*
@@ -130,43 +158,46 @@ static void spi_kontron_attach(struct parport *p)
 	 * We are binding to the generic drivers/hwmon/lm70.c device
 	 * driver.
 	 */
-	strcpy(pp->info.modalias, "lm70");
-	pp->info.max_speed_hz = 6 * 1000 * 1000;
-	pp->info.chip_select = 0;
-	pp->info.mode = SPI_3WIRE | SPI_MODE_0;
+	strcpy(pp->info.modalias, "lm70");			/*REVISIT*/
+	pp->info.max_speed_hz = 6 * 1000 * 1000;		/*REVISIT*/
+	pp->info.chip_select = 0;				/*REVISIT*/
+	/*pp->info.mode = SPI_3WIRE | SPI_MODE_0;*/  		/*REVISIT*/
 
 	/* power up the chip, and let the LM70 control SI/SO */
-	parport_write_data(pp->port, lm70_INIT);
+	parport_write_data(pp->port, kontron_INIT);
 
 	/* Enable access to our primary data structure via
 	 * the board info's (void *)controller_data.
 	 */
 	pp->info.controller_data = pp;
-	pp->spidev_lm70 = spi_new_device(pp->bitbang.master, &pp->info);
-	if (pp->spidev_lm70)
-		dev_dbg(&pp->spidev_lm70->dev, "spidev_lm70 at %s\n",
-				dev_name(&pp->spidev_lm70->dev));
-	else {
+	pp->spidev_kontron = spi_new_device(pp->bitbang.master, &pp->info);
+	if (pp->spidev_kontron)
+	{
+	 /*	dev_dbg(&pp->spidev_kontron->dev, "spidev_kontron at %s\n",
+				dev_name(&pp->spidev_kontron->dev));*/
+	}
+	else
+	{
 		printk(KERN_WARNING "%s: spi_new_device failed\n", DRVNAME);
 		status = -ENODEV;
-		goto out_bitbang_stop;
+		spi_bitbang_stop(&pp->bitbang);
+		printk(KERN_WARNING
+			"%s: returns %d\n",
+			DRVNAME, status);
+		
+		/* power down */
+		parport_write_data(pp->port, 0);
+		mdelay(10);
+		parport_release(pp->pd);
+		parport_unregister_device(pd);
+		(void) spi_master_put(master);
+		return;
+		
 	}
-	pp->spidev_lm70->bits_per_word = 8;
+	pp->spidev_kontron->bits_per_word = 8;
 
-	lm70llp = pp;
+	pkontron = pp;
 	return;
-
-out_bitbang_stop:
-	spi_bitbang_stop(&pp->bitbang);
-out_off_and_release:
-	/* power down */
-	parport_write_data(pp->port, 0);
-	mdelay(10);
-	parport_release(pp->pd);
-out_parport_unreg:
-	parport_unregister_device(pd);
-out_free_master:
-	(void) spi_master_put(master);
 }
 
 static void spi_kontron_detach(struct parport *p)

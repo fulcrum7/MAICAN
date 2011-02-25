@@ -46,6 +46,8 @@ struct spi_kontron {
 			struct spi_board_info	info;
 						
 		   };
+		   
+static struct spi_kontron *pkontron;
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
@@ -61,35 +63,37 @@ static void spi_kontron_attach(struct parport *p)
 	struct spi_master	*master;
 	int			status;
 
-	if (lm70llp)
+	if (pkontron)
 	{
-		printk(KERN_WARNING
-			    "%s: spi_lm70llp instance already loaded. Aborting.\n",
-			    DRVNAME);
-		return;
+	      printk(KERN_WARNING
+			 "%s: spi_kontron instance already loaded. Aborting.\n",
+			 DRVNAME);
+	      return;
 	}
 
-	/* TODO:  this just _assumes_ a lm70 is there ... no probe;
-	 * the lm70 driver could verify it, reading the manf ID.
-	 */
+	
 
 	master = spi_alloc_master(p->physport->dev, sizeof *pp);
-	if (!master) {
+	if (!master)
+	{
 		status = -ENOMEM;
-		goto out_fail;
+		printk(KERN_WARNING
+			 "%s: spi master isn't allocated \n",
+			 DRVNAME);
+		return;
 	}
 	pp = spi_master_get_devdata(master);
 
 	master->bus_num = -1;	/* dynamic alloc of a bus number */
-	master->num_chipselect = 1;
+	master->num_chipselect = 1;				/*REVISIT*/
 
 	/*
 	 * SPI and bitbang hookup.
 	 */
 	pp->bitbang.master = spi_master_get(master);
-	pp->bitbang.chipselect = lm70_chipselect;
-	pp->bitbang.txrx_word[SPI_MODE_0] = lm70_txrx;
-	pp->bitbang.flags = SPI_3WIRE;
+	pp->bitbang.chipselect = kontron_chipselect;
+	pp->bitbang.txrx_word[SPI_MODE_0] = kontron_txrx;	/*REVISIT*/
+	/*pp->bitbang.flags = SPI_3WIRE;*/			/*REVISIT*/
 
 	/*
 	 * Parport hookup
@@ -97,8 +101,9 @@ static void spi_kontron_attach(struct parport *p)
 	pp->port = p;
 	pd = parport_register_device(p, DRVNAME,
 			NULL, NULL, NULL,
-			PARPORT_FLAG_EXCL, pp);
-	if (!pd) {
+			PARPORT_FLAG_EXCL, pp);			/*REVISIT*/
+	if (!pd)
+	{
 		status = -ENOMEM;
 		goto out_free_master;
 	}
@@ -162,8 +167,6 @@ out_parport_unreg:
 	parport_unregister_device(pd);
 out_free_master:
 	(void) spi_master_put(master);
-out_fail:
-	pr_info("%s: spi_lm70llp probe fail, status %d\n", DRVNAME, status);
 }
 
 static void spi_kontron_detach(struct parport *p)

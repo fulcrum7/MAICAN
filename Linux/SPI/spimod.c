@@ -194,7 +194,7 @@ static void spi_kontron_attach(struct parport *p)
 		return;
 		
 	}
-	pp->spidev_kontron->bits_per_word = 8;
+	pp->spidev_kontron->bits_per_word = 8;		/*REVISIT*/
 
 	pkontron = pp;
 	return;
@@ -202,12 +202,12 @@ static void spi_kontron_attach(struct parport *p)
 
 static void spi_kontron_detach(struct parport *p)
 {
-	struct spi_lm70llp		*pp;
+	struct spi_kontron		*pp;
 
-	if (!lm70llp || lm70llp->port != p)
+	if (!pkontron || pkontron->port != p)
 		return;
 
-	pp = lm70llp;
+	pp = pkontron;
 	spi_bitbang_stop(&pp->bitbang);
 
 	/* power down */
@@ -218,7 +218,7 @@ static void spi_kontron_detach(struct parport *p)
 
 	(void) spi_master_put(pp->bitbang.master);
 
-	lm70llp = NULL;
+	pkontron = NULL;
 }
 
 /******************************************************************************

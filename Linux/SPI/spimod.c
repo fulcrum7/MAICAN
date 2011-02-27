@@ -48,10 +48,128 @@ struct spi_kontron {
 		   };
 		   
 static struct spi_kontron *pkontron;
+
+#define kontron_INIT	0xBE				/*REVISIT*/
+#define SIO		0x10				/*REVISIT*/
+#define nCS		0x20				/*REVISIT*/
+#define SCLK		0x40				/*REVISIT*/
+#define MOSI		0x40				/*REVISIT*/
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
 
+/*______________________functions-helpers_____________________________________*/
+
+static inline struct spi_kontron  *spidev_to_pp(struct spi_device *spi)
+{
+	return spi->controller_data;
+}
+
+/*
+*	Text below is important. It's a good idea to read it carefully and 
+*	rewrite code without parport reread as this is done in butterfly
+*
+*/
+
+/* NOTE:  we don't actually need to reread the output values, since they'll
+ * still be what we wrote before.  Plus, going through parport builds in
+ * a ~1ms/operation delay; these SPI transfers could easily be faster.
+ */
+
+static inline void deassertCS(struct spi_kontron *pp)
+{
+	u8 data = parport_read_data(pp->port);
+
+	data &= ~0x80;		
+	parport_write_data(pp->port, data | nCS);
+}
+
+static inline void assertCS(struct spi_kontron *pp)
+{
+	u8 data = parport_read_data(pp->port);
+
+	data |= 0x80;		
+	parport_write_data(pp->port, data & ~nCS);
+}
+
+static inline void clkHigh(struct spi_kontron *pp)
+{
+	u8 data = parport_read_data(pp->port);
+	parport_write_data(pp->port, data | SCLK);
+}
+
+static inline void clkLow(struct spi_kontron *pp)
+{
+	u8 data = parport_read_data(pp->port);
+	parport_write_data(pp->port, data & ~SCLK);
+}
+
+/*______________________define spi_bitbang inlines____________________________*/
+
+static inline void spidelay(unsigned d)
+{
+	udelay(d);						/*REVISIT*/
+}
+
+static inline void setsck(struct spi_device *s, int is_on)
+{
+	struct spi_kontron *pp = spidev_to_pp(s);
+
+	if (is_on)
+		clkHigh(pp);
+	else
+		clkLow(pp);
+}
+
+static inline void setmosi(struct spi_device *s, int is_on)
+{
+	struct spi_kontron *pp = spidev_to_pp(s);
+	if (is_on)
+	{
+		u8 data = parport_read_data(pp->port);
+		parport_write_data(pp->port, data | MOSI);
+	
+	}
+	else
+	{	
+		u8 data = parport_read_data(pp->port);
+		parport_write_data(pp->port, data & ~MOSI);
+	}
+}
+
+/*			REVISIT and read accurately
+ * getmiso:
+ * Why do we return 0 when the SIO line is high and vice-versa?
+ * The fact is, the lm70 eval board from NS (which this driver drives),
+ * is wired in just such a way : when the lm70's SIO goes high, a transistor
+ * switches it to low reflecting this on the parport (pin 13), and vice-versa.
+ */
+static inline int getmiso(struct spi_device *s)
+{
+	struct spi_kontron *pp = spidev_to_pp(s);
+	return ((SIO == (parport_read_status(pp->port) & SIO)) ? 0 : 1 );
+}
+/*______________________providing bitbang routines____________________________*/
+
+#include "spi_bitbang_txrx.h"
+
+static void kontron_chipselect(struct spi_device *spi, int value) /*REVISIT*/
+{
+	struct spi_kontron *pp = spidev_to_pp(spi);
+
+	if (value)
+		assertCS(pp);
+	else
+		deassertCS(pp);
+}
+
+/*
+ * Our actual bitbanger routine.
+ */
+static u32 kontron_txrx(struct spi_device *spi, unsigned nsecs, u32 word, u8 bits)
+{
+	return bitbang_txrx_be_cpha0(spi, nsecs, 0, 0, word, bits);
+}
 
 /******************************************************************************
 *			Module PARPORT METHODS

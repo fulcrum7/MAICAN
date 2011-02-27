@@ -1,4 +1,4 @@
-obj-m += spidev.o
+obj-m += spimod.o
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 install:

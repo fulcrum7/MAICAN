@@ -31,7 +31,22 @@ MODULE_AUTHOR("Alyautdin R.T.");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("BSP for Kontron SPI");
 
-
+/******************************************************************************
+*			Module PROC for debugging
+******************************************************************************/
+/*deb*/
+#include <linux/proc_fs.h>
+unsigned char procbuffer[55];
+#define PROC_NAME "spi"
+int procfile_read(char *buf, char **start,
+		  off_t offset,int count,int *eof, void *data)
+{
+	int len;
+	printk(KERN_ALERT "PROC is called");
+	len=sprintf(buf,"%lu",jiffies);
+	*eof=1;
+	return len;
+}
 
 /******************************************************************************
 *			Module GLOBAL VARIABLES
@@ -351,12 +366,14 @@ static struct parport_driver spi_kontron = {
 
 static int __init init_spi_kontron(void)
 {
+	create_proc_read_entry(PROC_NAME,0,NULL,procfile_read,procbuffer);
 	return parport_register_driver(&spi_kontron);
 }
 
 
 static void __exit cleanup_spi_kontron(void)
 {
+	remove_proc_entry(PROC_NAME,NULL);
 	parport_unregister_driver(&spi_kontron);
 }
 

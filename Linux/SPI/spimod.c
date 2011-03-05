@@ -64,11 +64,11 @@ struct spi_kontron {
 		   
 static struct spi_kontron *pkontron;
 
-#define kontron_INIT	0xBE				/*REVISIT*/
-#define SIO		0x10				/*REVISIT*/
-#define nCS		0x20				/*REVISIT*/
-#define SCLK		0x40				/*REVISIT*/
-#define MOSI		0x40				/*REVISIT*/
+#define kontron_INIT	0xFF				/*REVISIT*/
+#define SIO		0x00				/*REVISIT*/
+#define nCS		0x02				/*REVISIT*/
+#define SCLK		0x01				/*REVISIT*/
+#define MOSI		PARPORT_STATUS_BUSY 		/*REVISIT*/
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
@@ -310,6 +310,7 @@ static void spi_kontron_attach(struct parport *p)
 				dev_name(&pp->spidev_kontron->dev));*/
 	}
 	else
+
 	{
 		printk(KERN_WARNING "%s: spi_new_device failed\n", DRVNAME);
 		status = -ENODEV;

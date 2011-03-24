@@ -11,3 +11,5 @@ CountCS=6
 CountMOSI=304
 CountMISO=304
 
+NOTE: spidev protocol supported only!
+

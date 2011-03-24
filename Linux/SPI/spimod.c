@@ -36,14 +36,19 @@ MODULE_DESCRIPTION("BSP for Kontron SPI");
 ******************************************************************************/
 /*deb*/
 #include <linux/proc_fs.h>
-unsigned char procbuffer[55];
+unsigned char procbuffer[550];
+unsigned long countTX=0;
+unsigned long countCS=0;
+unsigned long countMOSI=0;
+unsigned long countMISO=0;
 #define PROC_NAME "spi"
 int procfile_read(char *buf, char **start,
 		  off_t offset,int count,int *eof, void *data)
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"%lu",jiffies);
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\n",
+			jiffies,countTX,countCS,countMOSI,countMISO);
 	*eof=1;
 	return len;
 }
@@ -95,7 +100,7 @@ static inline void deassertCS(struct spi_kontron *pp)
 {
 	u8 data = parport_read_data(pp->port);
 
-	data &= ~0x80;		
+	//data &= ~0x80;		/*REVISIT*/
 	parport_write_data(pp->port, data | nCS);
 }
 
@@ -103,7 +108,7 @@ static inline void assertCS(struct spi_kontron *pp)
 {
 	u8 data = parport_read_data(pp->port);
 
-	data |= 0x80;		
+	//data |= 0x80;			/*REVISIT*/
 	parport_write_data(pp->port, data & ~nCS);
 }
 
@@ -139,6 +144,7 @@ static inline void setsck(struct spi_device *s, int is_on)
 static inline void setmosi(struct spi_device *s, int is_on)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
+	/*deb*/countMOSI++;
 	if (is_on)
 	{
 		u8 data = parport_read_data(pp->port);
@@ -162,6 +168,7 @@ static inline void setmosi(struct spi_device *s, int is_on)
 static inline int getmiso(struct spi_device *s)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
+	/*deb*/countMISO++;
 	return ((SIO == (parport_read_status(pp->port) & SIO)) ? 0 : 1 );
 }
 /*______________________providing bitbang routines____________________________*/
@@ -171,6 +178,7 @@ static inline int getmiso(struct spi_device *s)
 static void kontron_chipselect(struct spi_device *spi, int value) /*REVISIT*/
 {
 	struct spi_kontron *pp = spidev_to_pp(spi);
+	/*deb*/countCS++;
 
 	if (value)
 		assertCS(pp);
@@ -183,6 +191,7 @@ static void kontron_chipselect(struct spi_device *spi, int value) /*REVISIT*/
  */
 static u32 kontron_txrx(struct spi_device *spi, unsigned nsecs, u32 word, u8 bits)
 {
+	/*deb*/countTX++;
 	return bitbang_txrx_be_cpha0(spi, nsecs, 0, 0, word, bits);
 }
 
@@ -195,6 +204,11 @@ static void spi_kontron_attach(struct parport *p)
 	struct spi_kontron	*pp;
 	struct spi_master	*master;
 	int			status;
+	printk(KERN_WARNING
+			 "%s: spi_kontron instance already loaded.\n",
+			 DRVNAME);
+
+
 
 	if (pkontron)
 	{
@@ -229,7 +243,7 @@ static void spi_kontron_attach(struct parport *p)
 	pp->bitbang.master = spi_master_get(master);
 	pp->bitbang.chipselect = kontron_chipselect;
 	pp->bitbang.txrx_word[SPI_MODE_0] = kontron_txrx;	/*REVISIT*/
-	/*pp->bitbang.flags = SPI_3WIRE;*/			/*REVISIT*/
+	pp->bitbang.flags =  SPI_MODE_0;			/*REVISIT*/
 
 	/*
 	 * Parport hookup
@@ -277,7 +291,7 @@ static void spi_kontron_attach(struct parport *p)
 			DRVNAME, status);
 		
 		/* power down */
-		parport_write_data(pp->port, 0);
+		parport_write_data(pp->port, 0);/*REVISIT*/
 		mdelay(10);
 		parport_release(pp->pd);
 		parport_unregister_device(pd);
@@ -291,10 +305,10 @@ static void spi_kontron_attach(struct parport *p)
 	 * We are binding to the generic drivers/hwmon/lm70.c device
 	 * driver.
 	 */
-	strcpy(pp->info.modalias, "lm70");			/*REVISIT*/
-	pp->info.max_speed_hz = 6 * 1000 * 1000;		/*REVISIT*/
+	strcpy(pp->info.modalias, "spidev");			/*REVISIT*/
+	pp->info.max_speed_hz =  1000;		/*REVISIT*/
 	pp->info.chip_select = 0;				/*REVISIT*/
-	/*pp->info.mode = SPI_3WIRE | SPI_MODE_0;*/  		/*REVISIT*/
+	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
 
 	/* power up the chip, and let the LM70 control SI/SO */
 	parport_write_data(pp->port, kontron_INIT);
@@ -320,7 +334,7 @@ static void spi_kontron_attach(struct parport *p)
 			DRVNAME, status);
 		
 		/* power down */
-		parport_write_data(pp->port, 0);
+		parport_write_data(pp->port, 0);/*REVISIT*/
 		mdelay(10);
 		parport_release(pp->pd);
 		parport_unregister_device(pd);
@@ -345,7 +359,7 @@ static void spi_kontron_detach(struct parport *p)
 	spi_bitbang_stop(&pp->bitbang);
 
 	/* power down */
-	parport_write_data(pp->port, 0);
+	parport_write_data(pp->port, 0);/*REVISIT*/
 
 	parport_release(pp->pd);
 	parport_unregister_device(pp->pd);

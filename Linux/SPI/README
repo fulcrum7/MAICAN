@@ -1,1 +1,13 @@
 Linux 2.37.1 SPI support for kontron
+for testing:
+1. run scr.emb.sh
+2. run spidev_test
+3. cat /proc/spi
+
+if everything is ok you will see something like:
+Jiffies=19697
+CountTx=38
+CountCS=6
+CountMOSI=304
+CountMISO=304
+

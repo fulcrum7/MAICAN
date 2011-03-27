@@ -16,7 +16,7 @@
 #include <linux/workqueue.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_bitbang.h>
-
+#include <linux/can/platform/mcp251x.h> //specific for mcp /*REVISIT*/
 
 
 
@@ -74,6 +74,8 @@ static struct spi_kontron *pkontron;
 #define nCS		0x02				/*REVISIT*/
 #define SCLK		0x01				/*REVISIT*/
 #define MOSI		PARPORT_STATUS_BUSY 		/*REVISIT*/
+
+static struct mcp251x_platform_data mcp251x_info;       /*REVISIT*/
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
@@ -305,10 +307,12 @@ static void spi_kontron_attach(struct parport *p)
 	 * We are binding to the generic drivers/hwmon/lm70.c device
 	 * driver.
 	 */
-	strcpy(pp->info.modalias, "spidev");			/*REVISIT*/
-	pp->info.max_speed_hz =  1000;		/*REVISIT*/
+	mcp251x_info.oscillator_frequency=16000000; /*NEW*/
+	strcpy(pp->info.modalias, "mcp2515");			/*REVISIT*/
+	pp->info.max_speed_hz =  9000001;		/*REVISIT*/
 	pp->info.chip_select = 0;				/*REVISIT*/
 	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
+	pp->info.platform_data=&mcp251x_info; /*NEW*/
 
 	/* power up the chip, and let the LM70 control SI/SO */
 	parport_write_data(pp->port, kontron_INIT);

@@ -41,14 +41,15 @@ unsigned long countTX=0;
 unsigned long countCS=0;
 unsigned long countMOSI=0;
 unsigned long countMISO=0;
+unsigned char DATA=0;
 #define PROC_NAME "spi"
 int procfile_read(char *buf, char **start,
 		  off_t offset,int count,int *eof, void *data)
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\n",
-			jiffies,countTX,countCS,countMOSI,countMISO);
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\n",
+			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
 	*eof=1;
 	return len;
 }
@@ -70,10 +71,10 @@ struct spi_kontron {
 static struct spi_kontron *pkontron;
 
 #define kontron_INIT	0xFF				/*REVISIT*/
-#define SIO		0x00				/*REVISIT*/
-#define nCS		0x02				/*REVISIT*/
-#define SCLK		0x01				/*REVISIT*/
-#define MOSI		PARPORT_STATUS_BUSY 		/*REVISIT*/
+#define MISO		PARPORT_STATUS_BUSY		/*REVISIT*/
+#define nCS		0x04				/*REVISIT*/
+#define SCLK		0x02				/*REVISIT*/
+#define MOSI		0x01	 	 		/*REVISIT*/
 
 static struct mcp251x_platform_data mcp251x_info;       /*REVISIT*/
 /******************************************************************************
@@ -146,16 +147,18 @@ static inline void setsck(struct spi_device *s, int is_on)
 static inline void setmosi(struct spi_device *s, int is_on)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
+	u8 data = parport_read_data(pp->port);
+	data=data & ~nCS;
 	/*deb*/countMOSI++;
 	if (is_on)
 	{
-		u8 data = parport_read_data(pp->port);
+		//u8 data = parport_read_data(pp->port);
 		parport_write_data(pp->port, data | MOSI);
-	
+		DATA=data| MOSI;
 	}
 	else
 	{	
-		u8 data = parport_read_data(pp->port);
+		//u8 data = parport_read_data(pp->port);
 		parport_write_data(pp->port, data & ~MOSI);
 	}
 }
@@ -171,7 +174,7 @@ static inline int getmiso(struct spi_device *s)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
 	/*deb*/countMISO++;
-	return ((SIO == (parport_read_status(pp->port) & SIO)) ? 0 : 1 );
+	return ((MISO == (parport_read_status(pp->port) & MISO)) ? 1 : 0 );
 }
 /*______________________providing bitbang routines____________________________*/
 
@@ -308,6 +311,7 @@ static void spi_kontron_attach(struct parport *p)
 	 * driver.
 	 */
 	mcp251x_info.oscillator_frequency=16000000; /*NEW*/
+
 	strcpy(pp->info.modalias, "mcp2515");			/*REVISIT*/
 	pp->info.max_speed_hz =  9000001;		/*REVISIT*/
 	pp->info.chip_select = 0;				/*REVISIT*/

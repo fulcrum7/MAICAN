@@ -48,7 +48,7 @@ int procfile_read(char *buf, char **start,
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\n",
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\n!!!",
 			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
 	*eof=1;
 	return len;
@@ -175,7 +175,7 @@ static inline int getmiso(struct spi_device *s)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
 	/*deb*/countMISO++;
-	return ((MISO == (parport_read_status(pp->port) & MISO)) ? 1 : 0 );
+	return ((MISO == (parport_read_status(pp->port) & MISO)) ? 0 : 1 );
 }
 /*______________________providing bitbang routines____________________________*/
 

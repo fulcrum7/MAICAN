@@ -148,8 +148,9 @@ static inline void setmosi(struct spi_device *s, int is_on)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
 	u8 data = parport_read_data(pp->port);
-	data=data & ~nCS;
 	/*deb*/countMOSI++;
+	data=data & ~nCS;
+
 	if (is_on)
 	{
 		//u8 data = parport_read_data(pp->port);

@@ -48,7 +48,7 @@ int procfile_read(char *buf, char **start,
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\n!!!",
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW!!!\n",
 			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
 	*eof=1;
 	return len;
@@ -318,7 +318,7 @@ static void spi_kontron_attach(struct parport *p)
 	pp->info.chip_select = 0;				/*REVISIT*/
 	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
 	pp->info.platform_data=&mcp251x_info; /*NEW*/
-
+	pp->info.irq=7; /*NEW*/
 	/* power up the chip, and let the LM70 control SI/SO */
 	parport_write_data(pp->port, kontron_INIT);
 

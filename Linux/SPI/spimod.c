@@ -17,7 +17,9 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_bitbang.h>
 #include <linux/can/platform/mcp251x.h> //specific for mcp /*REVISIT*/
-
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/gpio.h>
 
 
 
@@ -48,7 +50,7 @@ int procfile_read(char *buf, char **start,
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW!!!\n",
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW\n",
 			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
 	*eof=1;
 	return len;
@@ -210,6 +212,7 @@ static void spi_kontron_attach(struct parport *p)
 	struct spi_kontron	*pp;
 	struct spi_master	*master;
 	int			status;
+	//struct irqaction act;
 	printk(KERN_WARNING
 			 "%s: spi_kontron instance already loaded.\n",
 			 DRVNAME);
@@ -255,9 +258,8 @@ static void spi_kontron_attach(struct parport *p)
 	 * Parport hookup
 	 */
 	pp->port = p;
-	pd = parport_register_device(p, DRVNAME,
-			NULL, NULL, NULL,
-			PARPORT_FLAG_EXCL, pp);			/*REVISIT*/
+	parport_enable_irq(p);  /*NEW*/
+	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,IRQF_SHARED, pp); /*REVISIT*/
 	if (!pd)
 	{
 		status = -ENOMEM;
@@ -317,8 +319,11 @@ static void spi_kontron_attach(struct parport *p)
 	pp->info.max_speed_hz =  9000001;		/*REVISIT*/
 	pp->info.chip_select = 0;				/*REVISIT*/
 	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
+
 	pp->info.platform_data=&mcp251x_info; /*NEW*/
-	pp->info.irq=7; /*NEW*/
+
+	printk(KERN_WARNING "%s: irq=%d",DRVNAME,p->irq);
+	pp->info.irq=p->irq; /*NEW*/
 	/* power up the chip, and let the LM70 control SI/SO */
 	parport_write_data(pp->port, kontron_INIT);
 

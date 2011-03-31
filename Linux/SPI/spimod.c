@@ -50,7 +50,7 @@ int procfile_read(char *buf, char **start,
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW\n",
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW!!!\n",
 			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
 	*eof=1;
 	return len;
@@ -223,7 +223,7 @@ static void spi_kontron_attach(struct parport *p)
 	{
 	      printk(KERN_WARNING
 			 "%s: spi_kontron instance already loaded. Aborting.\n",
-			 DRVNAME);
+			  DRVNAME);
 	      return;
 	}
 
@@ -258,8 +258,8 @@ static void spi_kontron_attach(struct parport *p)
 	 * Parport hookup
 	 */
 	pp->port = p;
-	parport_enable_irq(p);  /*NEW*/
-	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,IRQF_SHARED, pp); /*REVISIT*/
+	//parport_enable_irq(p);  /*NEW*/
+	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,0, pp); /*REVISIT*/
 	if (!pd)
 	{
 		status = -ENOMEM;
@@ -323,7 +323,7 @@ static void spi_kontron_attach(struct parport *p)
 	pp->info.platform_data=&mcp251x_info; /*NEW*/
 
 	printk(KERN_WARNING "%s: irq=%d",DRVNAME,p->irq);
-	pp->info.irq=p->irq; /*NEW*/
+	//pp->info.irq=p->irq; /*NEW*/
 	/* power up the chip, and let the LM70 control SI/SO */
 	parport_write_data(pp->port, kontron_INIT);
 

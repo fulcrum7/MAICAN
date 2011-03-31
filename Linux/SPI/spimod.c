@@ -370,6 +370,7 @@ static void spi_kontron_detach(struct parport *p)
 		return;
 
 	pp = pkontron;
+	spi_unregister_device(pp->spidev_kontron);
 	spi_bitbang_stop(&pp->bitbang);
 
 	/* power down */

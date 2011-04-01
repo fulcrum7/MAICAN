@@ -804,13 +804,14 @@ int mcp251x_can_ist(int irq, struct mcp251x_priv *dev_id)
 	else
 	{
 		printk(KERN_WARNING "Pointer==%p!",dev_id);
-		return 0;
+		
 
 	}
 	priv=dev_id;
 	spi = priv->spi;
 	net = priv->net;	
 	printk(KERN_WARNING "EXECUTION STARTED");
+	return 0;
 	mutex_lock(&priv->mcp_lock);
 	while (!priv->force_quit) {
 		enum can_state new_state;

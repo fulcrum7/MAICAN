@@ -75,9 +75,11 @@
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
 #include <linux/uaccess.h>
-
-
-
+#include <linux/kthread.h>
+/*NEW*/
+/***************************************************************/
+struct task_struct *poll_struct;
+/***************************************************************/
 
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
@@ -262,15 +264,7 @@ struct mcp251x_priv {
 #define AFTER_SUSPEND_RESTART 8
 	int restart_tx;
 };
-/********************************************************/	/*REVISIT*/
-#include <linux/timer.h>
-static void timer_hendler(unsigned long param);
-static struct timer_list irq_timer;
-static struct mcp251x_priv  *glob_dev=NULL;
 
-
-
-/********************************************************/
 #define MCP251X_IS(_model) \
 static inline int mcp251x_is_##_model(struct spi_device *spi) \
 { \
@@ -687,10 +681,15 @@ static int mcp251x_stop(struct net_device *net)
 	close_candev(net);
 
 	priv->force_quit = 1;
-	free_irq(spi->irq, priv);
+	//free_irq(spi->irq, priv);
+/*Stop kthread NEW*/
+/********************************************************/
+kthread_stop(poll_struct);
+	printk(KERN_WARNING "Stop mcp");
+/********************************************************/
 	destroy_workqueue(priv->wq);
 	priv->wq = NULL;
-
+ 
 	mutex_lock(&priv->mcp_lock);
 
 	/* Disable and clear pending interrupts */
@@ -790,47 +789,25 @@ static void mcp251x_restart_work_handler(struct work_struct *ws)
 	mutex_unlock(&priv->mcp_lock);
 }
 
-//static irqreturn_t mcp251x_can_ist(int irq, void *dev_id)
-int mcp251x_can_ist(int irq, struct mcp251x_priv *dev_id)
+
+static int mcp251x_can_ist(int irq, void *dev_id)
 {
-	struct mcp251x_priv *priv;// = dev_id;
-	struct spi_device *spi;// = priv->spi;
-	struct net_device *net;// = priv->net;
-	priv=dev_id;
-	if(dev_id==NULL)
-	{
-		printk(KERN_WARNING "ZERO!");
-		return -1;
-	}
-	else 
-	{
-		printk(KERN_WARNING "Pointer=%p",priv);
-		printk(KERN_WARNING "Pointer mutex0==%p!",&(priv->mcp_lock));
-		printk(KERN_WARNING "Pointer mutex==%p!",&priv->mcp_lock);
-		
-
-	}
-	priv=dev_id;
-	spi = priv->spi;
-	net = priv->net;
-	
-	printk(KERN_WARNING "EXECUTION STARTED HERE");
-
+	struct mcp251x_priv *priv = dev_id;
+	struct spi_device *spi = priv->spi;
+	struct net_device *net = priv->net;
+	printk(KERN_WARNING "Handler  starts");
 	mutex_lock(&priv->mcp_lock);
-	printk(KERN_WARNING "EXECUTION IN CRITICAL SECTION");
-	mutex_unlock(&priv->mcp_lock);
-	printk(KERN_WARNING "EXECUTION ENDED");
-	return 0;	
-	//break; /*NEW*/
+
 	while (!priv->force_quit) {
-	
+
 		enum can_state new_state;
 		u8 intf, eflag;
 		u8 clear_intf = 0;
 		int can_id = 0, data1 = 0;
-
+		msleep(100);
+		printk(KERN_WARNING  "Handler calling");
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
-		
+
 		/* mask out flags we don't care about */
 		intf &= CANINTF_RX | CANINTF_TX | CANINTF_ERR;
 
@@ -942,30 +919,33 @@ int mcp251x_can_ist(int irq, struct mcp251x_priv *dev_id)
 		}
 
 	}
-	
 	mutex_unlock(&priv->mcp_lock);
-//	printk(KERN_WARNING "EXECUTION ENDED");
 	return 0;//IRQ_HANDLED;
 }
 
-/*****************************************************/		/*REVISIT*/
-static void timer_hendler(unsigned long param)
+
+/*********************************************************************/ /*NEW*/
+static int pollingthread(void *data)
 {
+	struct mcp251x_priv *priv=(struct mcp251x_priv *)data;
 
-	mcp251x_can_ist(0,glob_dev);
-	/*********************************/
-	printk(KERN_WARNING "TIMER!");
-	init_timer(&irq_timer);
-	irq_timer.expires=jiffies+15*HZ;
-	irq_timer.function=timer_hendler;
-	irq_timer.data=0;
-	add_timer(&irq_timer);	
+	while(1)
+	{
+		//printk(KERN_ALERT "Thread calling");
+		msleep(5000);
+		mcp251x_can_ist(7,priv);
+		if(kthread_should_stop())
+		{
+			break;
+		}
 
+
+	}
+
+
+	return 0;
 }
-/*****************************************************/
-
-
-
+/*********************************************************************/
 
 static int mcp251x_open(struct net_device *net)
 {
@@ -987,7 +967,7 @@ static int mcp251x_open(struct net_device *net)
 	priv->force_quit = 0;
 	priv->tx_skb = NULL;
 	priv->tx_len = 0;
-	printk(KERN_WARNING "Structure Pointer==%p!",priv);
+
 	/*ret = request_threaded_irq(spi->irq, NULL, mcp251x_can_ist,
 			  IRQF_TRIGGER_FALLING, DEVICE_NAME, priv);
 	if (ret) {
@@ -997,15 +977,12 @@ static int mcp251x_open(struct net_device *net)
 		close_candev(net);
 		goto open_unlock;
 	}*/
-/************************************************************/  /*REVISIT*/
-	glob_dev=priv;
-	printk(KERN_WARNING "TIMER STARTS");
-	init_timer(&irq_timer);
-	irq_timer.expires=jiffies+50*HZ;
-	irq_timer.function=timer_hendler;
-	add_timer(&irq_timer);      
-	printk(KERN_WARNING "TIMER STARTS2");
-/************************************************************/
+
+/*Open Kthread!*/
+/***************************************************************************/
+poll_struct=kthread_run(pollingthread,"%s","polling_thread");
+printk(KERN_ALERT " Polling started");
+/***************************************************************************/
 	priv->wq = create_freezeable_workqueue("mcp251x_wq");
 	INIT_WORK(&priv->tx_work, mcp251x_tx_work_handler);
 	INIT_WORK(&priv->restart_work, mcp251x_restart_work_handler);
@@ -1070,12 +1047,8 @@ static int __devinit mcp251x_can_probe(struct spi_device *spi)
 	dev_set_drvdata(&spi->dev, priv);
 
 	priv->spi = spi;
-
 	mutex_init(&priv->mcp_lock);
-	printk(KERN_WARNING "Pointer mutex in probe==%p!",&priv->mcp_lock);
-	mutex_lock(&priv->mcp_lock);
-	printk(KERN_ALERT "In critical area");
-	mutex_unlock(&priv->mcp_lock);
+
 	/* If requested, allocate DMA buffers */
 	if (mcp251x_enable_dma) {
 		spi->dev.coherent_dma_mask = ~0;

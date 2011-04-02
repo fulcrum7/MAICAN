@@ -50,11 +50,11 @@ proc=open("/proc/spi",O_RDWR);
 stat=read(proc,buffer,sizeof(buffer));
 write(1,buffer,stat);
 close(proc);
-printf("\n**************************************************\n");
+printf("\n***************************************************\n");
 printf("Try to write data\n");
 nbytes = write(sfd, &frame_wr, sizeof(struct can_frame)); // Send a CAN frame 
 printf("Successfully written %d bytes\n",nbytes);
-printf("\n**************************************************\n");
+printf("\n***************************************************\n");
 printf("Let's read /proc/spi\n");
 proc=open("/proc/spi",O_RDWR);
 stat=read(proc,buffer,sizeof(buffer));

@@ -55,6 +55,7 @@ printf("Try to write data\n");
 nbytes = write(sfd, &frame_wr, sizeof(struct can_frame)); // Send a CAN frame 
 printf("Successfully written %d bytes\n",nbytes);
 printf("\n****************************************************\n");
+sleep(1);
 printf("Let's read /proc/spi\n");
 proc=open("/proc/spi",O_RDWR);
 stat=read(proc,buffer,sizeof(buffer));

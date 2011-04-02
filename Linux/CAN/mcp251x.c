@@ -323,7 +323,7 @@ static int mcp251x_spi_trans(struct spi_device *spi, int len)
 	}
 
 	spi_message_add_tail(&t, &m);
-
+	printk(KERN_ALERT "Try to sync_________________________________________");
 	ret = spi_sync(spi, &m);
 	if (ret)
 		dev_err(&spi->dev, "spi transfer failed: ret = %d\n", ret);
@@ -503,19 +503,23 @@ static netdev_tx_t mcp251x_hard_start_xmit(struct sk_buff *skb,
 {
 	struct mcp251x_priv *priv = netdev_priv(net);
 	struct spi_device *spi = priv->spi;
-
-	if (priv->tx_skb || priv->tx_len) {
+	/*NEW*/ printk(KERN_ALERT "Transmission called");
+	if (priv->tx_skb || priv->tx_len)
+	 {
 		dev_warn(&spi->dev, "hard_xmit called while tx busy\n");
+		/*NEW*/ printk(KERN_ALERT "ERROR:tx busy");
 		return NETDEV_TX_BUSY;
 	}
 
 	if (can_dropped_invalid_skb(net, skb))
+	{
+		/*NEW*/ printk(KERN_ALERT "Transmission succed. Check results");
 		return NETDEV_TX_OK;
-
+	}
 	netif_stop_queue(net);
 	priv->tx_skb = skb;
 	queue_work(priv->wq, &priv->tx_work);
-
+	/*NEW*/ printk(KERN_ALERT "Transmission succed");
 	return NETDEV_TX_OK;
 }
 
@@ -790,12 +794,13 @@ static void mcp251x_restart_work_handler(struct work_struct *ws)
 }
 
 
-static int mcp251x_can_ist(int irq, void *dev_id)
+static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 {
 	struct mcp251x_priv *priv = dev_id;
 	struct spi_device *spi = priv->spi;
 	struct net_device *net = priv->net;
-	printk(KERN_WARNING "Handler  starts");
+	printk(KERN_WARNING "Handler  starts priv=%p",priv);
+
 	mutex_lock(&priv->mcp_lock);
 
 	while (!priv->force_quit) {
@@ -804,8 +809,8 @@ static int mcp251x_can_ist(int irq, void *dev_id)
 		u8 intf, eflag;
 		u8 clear_intf = 0;
 		int can_id = 0, data1 = 0;
-		msleep(100);
-		printk(KERN_WARNING  "Handler calling");
+		msleep(1000);
+		//printk(KERN_WARNING  "Handler calling _________________________________");
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
 
 		/* mask out flags we don't care about */
@@ -818,7 +823,7 @@ static int mcp251x_can_ist(int irq, void *dev_id)
 			 * Free one buffer ASAP
 			 * (The MCP2515 does this automatically.)
 			 */
-			if (mcp251x_is_2510(spi))
+		/*TRY*///	if (mcp251x_is_2510(spi))
 				mcp251x_write_bits(spi, CANINTF, CANINTF_RX0IF, 0x00);
 		}
 
@@ -826,7 +831,7 @@ static int mcp251x_can_ist(int irq, void *dev_id)
 		if (intf & CANINTF_RX1IF) {
 			mcp251x_hw_rx(spi, 1);
 			/* the MCP2515 does this automatically */
-			if (mcp251x_is_2510(spi))
+		/*TRY*/// if (mcp251x_is_2510(spi))
 				clear_intf |= CANINTF_RX1IF;
 		}
 
@@ -931,7 +936,7 @@ static int pollingthread(void *data)
 
 	while(1)
 	{
-		//printk(KERN_ALERT "Thread calling");
+		printk(KERN_ALERT "Thread calling force_quit=%d",priv->force_quit);
 		msleep(5000);
 		mcp251x_can_ist(7,priv);
 		if(kthread_should_stop())
@@ -980,7 +985,7 @@ static int mcp251x_open(struct net_device *net)
 
 /*Open Kthread!*/
 /***************************************************************************/
-poll_struct=kthread_run(pollingthread,"%s","polling_thread");
+poll_struct=kthread_run(pollingthread,priv,"polling_thread");
 printk(KERN_ALERT " Polling started");
 /***************************************************************************/
 	priv->wq = create_freezeable_workqueue("mcp251x_wq");
@@ -989,16 +994,19 @@ printk(KERN_ALERT " Polling started");
 
 	ret = mcp251x_hw_reset(spi);
 	if (ret) {
+printk(KERN_ALERT "OPEN calling hwreset");
 		mcp251x_open_clean(net);
 		goto open_unlock;
 	}
 	ret = mcp251x_setup(net, priv, spi);
 	if (ret) {
+printk(KERN_ALERT "OPEN calling hwreset setup");
 		mcp251x_open_clean(net);
 		goto open_unlock;
 	}
 	ret = mcp251x_set_normal_mode(spi);
 	if (ret) {
+printk(KERN_ALERT "OPEN calling normal mode");
 		mcp251x_open_clean(net);
 		goto open_unlock;
 	}
@@ -1006,6 +1014,7 @@ printk(KERN_ALERT " Polling started");
 
 open_unlock:
 	mutex_unlock(&priv->mcp_lock);
+	printk(KERN_ALERT "OPEN calling priv=%p",priv);
 	return ret;
 }
 
@@ -1164,7 +1173,7 @@ static int mcp251x_can_suspend(struct spi_device *spi, pm_message_t state)
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 	struct mcp251x_priv *priv = dev_get_drvdata(&spi->dev);
 	struct net_device *net = priv->net;
-
+	printk(KERN_ALERT " Suspend called");
 	priv->force_quit = 1;
 	disable_irq(spi->irq);
 	/*
@@ -1194,7 +1203,7 @@ static int mcp251x_can_resume(struct spi_device *spi)
 {
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 	struct mcp251x_priv *priv = dev_get_drvdata(&spi->dev);
-
+	printk(KERN_ALERT " Resume called");
 	if (priv->after_suspend & AFTER_SUSPEND_POWER) {
 		pdata->power_enable(1);
 		queue_work(priv->wq, &priv->restart_work);

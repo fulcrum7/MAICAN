@@ -323,7 +323,7 @@ static int mcp251x_spi_trans(struct spi_device *spi, int len)
 	}
 
 	spi_message_add_tail(&t, &m);
-	printk(KERN_ALERT "Try to sync_________________________________________");
+	printk(KERN_ALERT "Try to sync_________spi=%p",spi);
 	ret = spi_sync(spi, &m);
 	if (ret)
 		dev_err(&spi->dev, "spi transfer failed: ret = %d\n", ret);
@@ -503,7 +503,7 @@ static netdev_tx_t mcp251x_hard_start_xmit(struct sk_buff *skb,
 {
 	struct mcp251x_priv *priv = netdev_priv(net);
 	struct spi_device *spi = priv->spi;
-	/*NEW*/ printk(KERN_ALERT "Transmission called");
+	/*NEW*/ printk(KERN_ALERT "Transmission called spi=%p",spi);
 	if (priv->tx_skb || priv->tx_len)
 	 {
 		dev_warn(&spi->dev, "hard_xmit called while tx busy\n");
@@ -799,7 +799,7 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 	struct mcp251x_priv *priv = dev_id;
 	struct spi_device *spi = priv->spi;
 	struct net_device *net = priv->net;
-	printk(KERN_WARNING "Handler  starts priv=%p",priv);
+	printk(KERN_WARNING "Handler  starts spi=%p",priv->spi);
 
 	mutex_lock(&priv->mcp_lock);
 
@@ -823,7 +823,7 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 			 * Free one buffer ASAP
 			 * (The MCP2515 does this automatically.)
 			 */
-		/*TRY*///	if (mcp251x_is_2510(spi))
+			if (mcp251x_is_2510(spi))
 				mcp251x_write_bits(spi, CANINTF, CANINTF_RX0IF, 0x00);
 		}
 
@@ -831,7 +831,7 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 		if (intf & CANINTF_RX1IF) {
 			mcp251x_hw_rx(spi, 1);
 			/* the MCP2515 does this automatically */
-		/*TRY*/// if (mcp251x_is_2510(spi))
+		 if (mcp251x_is_2510(spi))
 				clear_intf |= CANINTF_RX1IF;
 		}
 
@@ -1030,7 +1030,7 @@ static int __devinit mcp251x_can_probe(struct spi_device *spi)
 	struct mcp251x_priv *priv;
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 	int ret = -ENODEV;
-
+	printk(KERN_ALERT "Probe called spi=%p",spi);
 	if (!pdata)
 		/* Platform data is required for osc freq */
 		goto error_out;

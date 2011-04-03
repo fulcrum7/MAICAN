@@ -323,7 +323,7 @@ static int mcp251x_spi_trans(struct spi_device *spi, int len)
 	}
 
 	spi_message_add_tail(&t, &m);
-	printk(KERN_ALERT "Try to sync_________spi=%p",spi);
+	//printk(KERN_ALERT "Try to sync_________spi=%p",spi);
 	ret = spi_sync(spi, &m);
 	if (ret)
 		dev_err(&spi->dev, "spi transfer failed: ret = %d\n", ret);
@@ -519,7 +519,7 @@ static netdev_tx_t mcp251x_hard_start_xmit(struct sk_buff *skb,
 	netif_stop_queue(net);
 	priv->tx_skb = skb;
 	queue_work(priv->wq, &priv->tx_work);
-	/*NEW*/ printk(KERN_ALERT "Transmission succed");
+	/*NEW*/ printk(KERN_ALERT "Transmission succeded");
 	return NETDEV_TX_OK;
 }
 
@@ -738,12 +738,14 @@ static void mcp251x_tx_work_handler(struct work_struct *ws)
 	struct spi_device *spi = priv->spi;
 	struct net_device *net = priv->net;
 	struct can_frame *frame;
-
+	printk(KERN_WARNING "***********************************TX_WORK_HANDLER calling");
 	mutex_lock(&priv->mcp_lock);
 	if (priv->tx_skb) {
 		if (priv->can.state == CAN_STATE_BUS_OFF) {
+	printk(KERN_WARNING "***********************************TX_WORK_HANDLER calling: CAN_STATE_BUS_OFF");
 			mcp251x_clean(net);
 		} else {
+	printk(KERN_WARNING "***********************************TX_WORK_HANDLER calling: CAN_STATE_BUS_ON");
 			frame = (struct can_frame *)priv->tx_skb->data;
 
 			if (frame->can_dlc > CAN_FRAME_MAX_DATA_LEN)
@@ -752,6 +754,7 @@ static void mcp251x_tx_work_handler(struct work_struct *ws)
 			priv->tx_len = 1 + frame->can_dlc;
 			can_put_echo_skb(priv->tx_skb, net, 0);
 			priv->tx_skb = NULL;
+			mcp251x_write_reg(spi, CANINTF,CANINTF_TX);
 		}
 	}
 	mutex_unlock(&priv->mcp_lock);
@@ -799,7 +802,7 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 	struct mcp251x_priv *priv = dev_id;
 	struct spi_device *spi = priv->spi;
 	struct net_device *net = priv->net;
-	printk(KERN_WARNING "Handler  starts spi=%p",priv->spi);
+	//printk(KERN_WARNING "Handler  starts spi=%p",priv->spi);
 
 	mutex_lock(&priv->mcp_lock);
 
@@ -809,10 +812,10 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 		u8 intf, eflag;
 		u8 clear_intf = 0;
 		int can_id = 0, data1 = 0;
-		msleep(1000);
+
 		//printk(KERN_WARNING  "Handler calling _________________________________");
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
-
+		printk(KERN_WARNING "******************************** FLAG=%x",intf);
 		/* mask out flags we don't care about */
 		intf &= CANINTF_RX | CANINTF_TX | CANINTF_ERR;
 
@@ -936,8 +939,8 @@ static int pollingthread(void *data)
 
 	while(1)
 	{
-		printk(KERN_ALERT "Thread calling force_quit=%d",priv->force_quit);
-		msleep(5000);
+		//printk(KERN_ALERT "Thread calling force_quit=%d",priv->force_quit);
+		msleep(1000);
 		mcp251x_can_ist(7,priv);
 		if(kthread_should_stop())
 		{

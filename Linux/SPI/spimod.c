@@ -316,7 +316,7 @@ static void spi_kontron_attach(struct parport *p)
 	mcp251x_info.oscillator_frequency=16000000; /*NEW*/
 
 	strcpy(pp->info.modalias, "mcp2515");			/*REVISIT*/
-	pp->info.max_speed_hz =  9000005;		/*REVISIT*/
+	pp->info.max_speed_hz =  8*1000*1000;		/*REVISIT*/
 	pp->info.chip_select = 0;				/*REVISIT*/
 	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
 

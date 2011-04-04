@@ -46,8 +46,8 @@ int procfile_read(char *buf, char **start,
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\n\
-			CountMOSI=%lu\nCountMISO=%lu\n",
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\n"
+			"CountMOSI=%lu\nCountMISO=%lu\n",
 			jiffies,countTX,countCS,countMOSI,countMISO);
 	*eof=1;
 	return len;

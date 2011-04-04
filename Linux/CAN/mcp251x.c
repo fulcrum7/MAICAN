@@ -754,7 +754,7 @@ static void mcp251x_tx_work_handler(struct work_struct *ws)
 			priv->tx_len = 1 + frame->can_dlc;
 			can_put_echo_skb(priv->tx_skb, net, 0);
 			priv->tx_skb = NULL;
-			mcp251x_write_reg(spi, CANINTF,CANINTF_TX);
+			//mcp251x_write_reg(spi, CANINTF,CANINTF_TX);
 		}
 	}
 	mutex_unlock(&priv->mcp_lock);
@@ -815,7 +815,8 @@ static int mcp251x_can_ist(int irq, struct mcp251x_priv  *dev_id)
 
 		//printk(KERN_WARNING  "Handler calling _________________________________");
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
-		printk(KERN_WARNING "******************************** FLAG=%x",intf);
+		printk(KERN_WARNING "******************************** FLAGE=%x",eflag);
+		printk(KERN_WARNING "******************************** FLAGF=%x",intf);
 		/* mask out flags we don't care about */
 		intf &= CANINTF_RX | CANINTF_TX | CANINTF_ERR;
 
@@ -961,7 +962,7 @@ static int mcp251x_open(struct net_device *net)
 	struct spi_device *spi = priv->spi;
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 	int ret;
-
+//	u8 intf, eflag;
 	ret = open_candev(net);
 	if (ret) {
 		dev_err(&spi->dev, "unable to set initial baudrate!\n");
@@ -1014,7 +1015,14 @@ printk(KERN_ALERT "OPEN calling normal mode");
 		goto open_unlock;
 	}
 	netif_wake_queue(net);
-
+/*	printk(KERN_ALERT "Write CANINTF_TX");
+	mcp251x_write_reg(spi, CANINTF,CANINTF_TX);
+	mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
+	printk(KERN_ALERT "RESULT F=%x   E=%x",intf,eflag);
+	printk(KERN_ALERT "Write 000");
+	mcp251x_write_reg(spi, CANINTF,0x00);
+	mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
+	printk(KERN_ALERT "RESULT F=%x   E=%x",intf,eflag);*/
 open_unlock:
 	mutex_unlock(&priv->mcp_lock);
 	printk(KERN_ALERT "OPEN calling priv=%p",priv);

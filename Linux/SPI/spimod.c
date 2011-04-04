@@ -12,14 +12,11 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/parport.h>
-#include <linux/sysfs.h>                 //???
 #include <linux/workqueue.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_bitbang.h>
-#include <linux/can/platform/mcp251x.h> //specific for mcp /*REVISIT*/
-#include <linux/interrupt.h>
-#include <linux/irq.h>
-#include <linux/gpio.h>
+#include <linux/can/platform/mcp251x.h> //specific for mcp 
+
 
 
 
@@ -31,7 +28,7 @@
 
 MODULE_AUTHOR("Alyautdin R.T.");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("BSP for Kontron SPI");
+MODULE_DESCRIPTION("Spi contoller driver for mcp2515");
 
 /******************************************************************************
 *			Module PROC for debugging
@@ -43,15 +40,15 @@ unsigned long countTX=0;
 unsigned long countCS=0;
 unsigned long countMOSI=0;
 unsigned long countMISO=0;
-unsigned char DATA=0;
-#define PROC_NAME "spi"
+#define PROC_NAME "spi_kontron"
 int procfile_read(char *buf, char **start,
 		  off_t offset,int count,int *eof, void *data)
 {
 	int len;
 	printk(KERN_ALERT "PROC is called");
-	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\nCountMOSI=%lu\nCountMISO=%lu\nDATA=%x\nNEW!!!\n",
-			jiffies,countTX,countCS,countMOSI,countMISO,DATA);
+	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\n\
+			CountMOSI=%lu\nCountMISO=%lu\n",
+			jiffies,countTX,countCS,countMOSI,countMISO);
 	*eof=1;
 	return len;
 }
@@ -73,47 +70,41 @@ struct spi_kontron {
 static struct spi_kontron *pkontron;
 
 #define kontron_INIT	0xFF				/*REVISIT*/
-#define MISO		PARPORT_STATUS_BUSY		/*REVISIT*/
-#define nCS		0x04				/*REVISIT*/
-#define SCLK		0x02				/*REVISIT*/
-#define MOSI		0x01	 	 		/*REVISIT*/
+#define MISO		PARPORT_STATUS_BUSY		
+#define nCS		0x04				
+#define SCLK		0x02				
+#define MOSI		0x01	 	 		
 
-static struct mcp251x_platform_data mcp251x_info;       /*REVISIT*/
+static struct mcp251x_platform_data mcp251x_info;       
+
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
 
-/*______________________functions-helpers_____________________________________*/
+/*______________________functions-helpers____________________________________*/
 
 static inline struct spi_kontron  *spidev_to_pp(struct spi_device *spi)
 {
 	return spi->controller_data;
 }
 
-/*
-*	Text below is important. It's a good idea to read it carefully and 
-*	rewrite code without parport reread as this is done in butterfly
-*
-*/
+
 
 /* NOTE:  we don't actually need to reread the output values, since they'll
  * still be what we wrote before.  Plus, going through parport builds in
  * a ~1ms/operation delay; these SPI transfers could easily be faster.
+ * 
  */
 
 static inline void deassertCS(struct spi_kontron *pp)
 {
 	u8 data = parport_read_data(pp->port);
-
-	//data &= ~0x80;		/*REVISIT*/
 	parport_write_data(pp->port, data | nCS);
 }
 
 static inline void assertCS(struct spi_kontron *pp)
 {
 	u8 data = parport_read_data(pp->port);
-
-	//data |= 0x80;			/*REVISIT*/
 	parport_write_data(pp->port, data & ~nCS);
 }
 
@@ -129,7 +120,7 @@ static inline void clkLow(struct spi_kontron *pp)
 	parport_write_data(pp->port, data & ~SCLK);
 }
 
-/*______________________define spi_bitbang inlines____________________________*/
+/*______________________define spi_bitbang inlines___________________________*/
 
 static inline void spidelay(unsigned d)
 {
@@ -155,23 +146,16 @@ static inline void setmosi(struct spi_device *s, int is_on)
 
 	if (is_on)
 	{
-		//u8 data = parport_read_data(pp->port);
 		parport_write_data(pp->port, data | MOSI);
-		DATA=data| MOSI;
 	}
 	else
 	{	
-		//u8 data = parport_read_data(pp->port);
 		parport_write_data(pp->port, data & ~MOSI);
 	}
 }
 
-/*			REVISIT and read accurately
- * getmiso:
- * Why do we return 0 when the SIO line is high and vice-versa?
- * The fact is, the lm70 eval board from NS (which this driver drives),
- * is wired in just such a way : when the lm70's SIO goes high, a transistor
- * switches it to low reflecting this on the parport (pin 13), and vice-versa.
+/*			
+ * This code depends on board wiring.  
  */
 static inline int getmiso(struct spi_device *s)
 {
@@ -183,7 +167,7 @@ static inline int getmiso(struct spi_device *s)
 
 #include "spi_bitbang_txrx.h"
 
-static void kontron_chipselect(struct spi_device *spi, int value) /*REVISIT*/
+static void kontron_chipselect(struct spi_device *spi, int value) 
 {
 	struct spi_kontron *pp = spidev_to_pp(spi);
 	/*deb*/countCS++;
@@ -197,7 +181,8 @@ static void kontron_chipselect(struct spi_device *spi, int value) /*REVISIT*/
 /*
  * Our actual bitbanger routine.
  */
-static u32 kontron_txrx(struct spi_device *spi, unsigned nsecs, u32 word, u8 bits)
+static u32 kontron_txrx(struct spi_device *spi,
+		   	 unsigned nsecs, u32 word, u8 bits)
 {
 	/*deb*/countTX++;
 	return bitbang_txrx_be_cpha0(spi, nsecs, 0, 0, word, bits);
@@ -206,24 +191,19 @@ static u32 kontron_txrx(struct spi_device *spi, unsigned nsecs, u32 word, u8 bit
 /******************************************************************************
 *			Module PARPORT METHODS
 ******************************************************************************/
+
 static void spi_kontron_attach(struct parport *p)
 {
 	struct pardevice	*pd;
 	struct spi_kontron	*pp;
 	struct spi_master	*master;
 	int			status;
-	//struct irqaction act;
-	printk(KERN_WARNING
-			 "%s: spi_kontron instance already loaded.\n",
-			 DRVNAME);
-
-
 
 	if (pkontron)
 	{
 	      printk(KERN_WARNING
-			 "%s: spi_kontron instance already loaded. Aborting.\n",
-			  DRVNAME);
+		       "%s: spi_kontron instance already loaded. Aborting.\n",
+		       DRVNAME);
 	      return;
 	}
 
@@ -243,23 +223,22 @@ static void spi_kontron_attach(struct parport *p)
 	}
 	pp = spi_master_get_devdata(master);
 
-	master->bus_num = -1;	/* dynamic alloc of a bus number */
-	master->num_chipselect = 1;				/*REVISIT*/
+	master->bus_num = -1;		/* dynamic alloc of a bus number */
+	master->num_chipselect = 1;				
 
 	/*
 	 * SPI and bitbang hookup.
 	 */
 	pp->bitbang.master = spi_master_get(master);
 	pp->bitbang.chipselect = kontron_chipselect;
-	pp->bitbang.txrx_word[SPI_MODE_0] = kontron_txrx;	/*REVISIT*/
-	pp->bitbang.flags =  SPI_MODE_0;			/*REVISIT*/
+	pp->bitbang.txrx_word[SPI_MODE_0] = kontron_txrx;	
+	pp->bitbang.flags =  SPI_MODE_0;			
 
 	/*
 	 * Parport hookup
 	 */
 	pp->port = p;
-	//parport_enable_irq(p);  /*NEW*/
-	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,0, pp); /*REVISIT*/
+	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,0, pp); 
 	if (!pd)
 	{
 		status = -ENOMEM;
@@ -299,7 +278,7 @@ static void spi_kontron_attach(struct parport *p)
 			DRVNAME, status);
 		
 		/* power down */
-		parport_write_data(pp->port, 0);/*REVISIT*/
+		parport_write_data(pp->port, 0x08);          /*REVISIT*/
 		mdelay(10);
 		parport_release(pp->pd);
 		parport_unregister_device(pd);
@@ -310,21 +289,20 @@ static void spi_kontron_attach(struct parport *p)
 	/*
 	 * The modalias name MUST match the device_driver name
 	 * for the bus glue code to match and subsequently bind them.
-	 * We are binding to the generic drivers/hwmon/lm70.c device
+	 * We are binding to the generic drivers/net/can/mcp251x.c device
 	 * driver.
 	 */
-	mcp251x_info.oscillator_frequency=16000000; /*NEW*/
+	mcp251x_info.oscillator_frequency=16000000; 
 
-	strcpy(pp->info.modalias, "mcp2515");			/*REVISIT*/
-	pp->info.max_speed_hz =  8*1000*1000;		/*REVISIT*/
-	pp->info.chip_select = 0;				/*REVISIT*/
-	pp->info.mode = SPI_MODE_0;  		/*REVISIT*/
+	strcpy(pp->info.modalias, "mcp2515");			
+	pp->info.max_speed_hz =  10*1000*1000;		    
+	pp->info.chip_select = 0;				
+	pp->info.mode = SPI_MODE_0;  		
 
-	pp->info.platform_data=&mcp251x_info; /*NEW*/
+	pp->info.platform_data=&mcp251x_info; 
 
-	printk(KERN_WARNING "%s: irq=%d",DRVNAME,p->irq);
-	//pp->info.irq=p->irq; /*NEW*/
-	/* power up the chip, and let the LM70 control SI/SO */
+
+	/* power up the chip */
 	parport_write_data(pp->port, kontron_INIT);
 
 	/* Enable access to our primary data structure via
@@ -334,8 +312,8 @@ static void spi_kontron_attach(struct parport *p)
 	pp->spidev_kontron = spi_new_device(pp->bitbang.master, &pp->info);
 	if (pp->spidev_kontron)
 	{
-	 /*	dev_dbg(&pp->spidev_kontron->dev, "spidev_kontron at %s\n",
-				dev_name(&pp->spidev_kontron->dev));*/
+	 	dev_dbg(&pp->spidev_kontron->dev, "spidev_kontron at %s\n",
+				dev_name(&pp->spidev_kontron->dev));
 	}
 	else
 
@@ -348,7 +326,7 @@ static void spi_kontron_attach(struct parport *p)
 			DRVNAME, status);
 		
 		/* power down */
-		parport_write_data(pp->port, 0);/*REVISIT*/
+		parport_write_data(pp->port, 0x08);        /*REVISIT*/
 		mdelay(10);
 		parport_release(pp->pd);
 		parport_unregister_device(pd);
@@ -356,7 +334,7 @@ static void spi_kontron_attach(struct parport *p)
 		return;
 		
 	}
-	pp->spidev_kontron->bits_per_word = 8;		/*REVISIT*/
+	pp->spidev_kontron->bits_per_word = 8;		
 
 	pkontron = pp;
 	return;
@@ -374,7 +352,7 @@ static void spi_kontron_detach(struct parport *p)
 	spi_bitbang_stop(&pp->bitbang);
 
 	/* power down */
-	parport_write_data(pp->port, 0);/*REVISIT*/
+	parport_write_data(pp->port, 0x08);                  /*REVISIT*/
 
 	parport_release(pp->pd);
 	parport_unregister_device(pp->pd);

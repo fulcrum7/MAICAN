@@ -69,7 +69,7 @@ struct spi_kontron {
 		   
 static struct spi_kontron *pkontron;
 
-#define kontron_INIT	0xFF				/*REVISIT*/
+#define kontron_INIT	0xFF				
 #define MISO		PARPORT_STATUS_BUSY		
 #define nCS		0x04				
 #define SCLK		0x02				
@@ -124,7 +124,7 @@ static inline void clkLow(struct spi_kontron *pp)
 
 static inline void spidelay(unsigned d)
 {
-	udelay(d);						/*REVISIT*/
+	udelay(d);						
 }
 
 static inline void setsck(struct spi_device *s, int is_on)

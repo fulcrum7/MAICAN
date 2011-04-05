@@ -1,0 +1,10 @@
+To install kontron SPI-BSP do further steps:
+#modprobe spi_bitbang
+#modprobe can
+#insmod spimod.ko
+#insmod mcp251x.ko
+
+If everything is ok you'll see in dmesg output "... mcp probed".
+To set network up type:
+#ip link set can0 type can bitrate 1000000
+#ifconfig can0 up

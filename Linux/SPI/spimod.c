@@ -69,17 +69,37 @@ struct spi_kontron {
 		   
 static struct spi_kontron *pkontron;
 
+/* Wiring information. See datasheet for details */
 #define kontron_INIT	0xFF				
 #define MISO		PARPORT_STATUS_BUSY		
 #define nCS		0x04				
 #define SCLK		0x02				
 #define MOSI		0x01	 	 		
 
+/* This structure is used by mcp251x driver */
 static struct mcp251x_platform_data mcp251x_info;       
 
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
+
+/*
+*	To use spi_bitbang, the driver should provide some routinies, because
+*	It "knows" what pins do what. These functions are declared in 
+*	/driver/spi/spi_bitbang_txrx.h . The driver fills in further
+*	inline functions:
+* 	 *  void setsck(struct spi_device *, int is_on);
+*	 *  void setmosi(struct spi_device *, int is_on);
+*	 *  int getmiso(struct spi_device *);
+*	 *  void spidelay(unsigned);
+*	The routines are  used by  bitbang_txrx_be_cpha0 which is wrapped
+*	 by the driver by means of kontron_txrx (actual bitbanger).
+*	Also chipselect function is added. Both these functions are send below
+*	to struct spi_bitbang. See more information in
+*	  /driver/spi/spi_bitbang_txrx.h
+*/
+
+
 
 /*______________________functions-helpers____________________________________*/
 
@@ -90,11 +110,7 @@ static inline struct spi_kontron  *spidev_to_pp(struct spi_device *spi)
 
 
 
-/* NOTE:  we don't actually need to reread the output values, since they'll
- * still be what we wrote before.  Plus, going through parport builds in
- * a ~1ms/operation delay; these SPI transfers could easily be faster.
- * 
- */
+
 
 static inline void deassertCS(struct spi_kontron *pp)
 {
@@ -142,7 +158,7 @@ static inline void setmosi(struct spi_device *s, int is_on)
 	struct spi_kontron *pp = spidev_to_pp(s);
 	u8 data = parport_read_data(pp->port);
 	/*deb*/countMOSI++;
-	data=data & ~nCS;
+	data=data & ~nCS;  /* mcp2515 do anything only with low chiselect*/
 
 	if (is_on)
 	{
@@ -155,8 +171,10 @@ static inline void setmosi(struct spi_device *s, int is_on)
 }
 
 /*			
- * This code depends on board wiring.  
- */
+*  This code depends on the board wiring.  
+*  According to spi_bitbang rules getmiso function must return 0 or 1 only!
+*  Inversion of bits is used because of hardware invertor on the board.
+*/
 static inline int getmiso(struct spi_device *s)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
@@ -292,6 +310,9 @@ static void spi_kontron_attach(struct parport *p)
 	 * We are binding to the generic drivers/net/can/mcp251x.c device
 	 * driver.
 	 */
+	
+
+	/* This is used by mcp251x driver */
 	mcp251x_info.oscillator_frequency=16000000; 
 
 	strcpy(pp->info.modalias, "mcp2515");			

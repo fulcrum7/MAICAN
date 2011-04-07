@@ -920,7 +920,7 @@ static int pollingthread(void *data)
 	while(1)
 	{
 
-		udelay(70);
+		udelay( 70);
 		mcp251x_can_ist(priv);
 		if(kthread_should_stop())
 		{

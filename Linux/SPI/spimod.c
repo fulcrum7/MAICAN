@@ -64,6 +64,7 @@ struct spi_kontron {
 			struct pardevice	*pd;
 			struct spi_device	*spidev_kontron;
 			struct spi_board_info	info;
+			u8                      lastbyte;
 						
 		   };
 		   
@@ -94,7 +95,7 @@ static struct mcp251x_platform_data mcp251x_info;
 *	 *  void spidelay(unsigned);
 *	The routines are  used by  bitbang_txrx_be_cpha0 which is wrapped
 *	 by the driver by means of kontron_txrx (actual bitbanger).
-*	Also chipselect function is added. Both these functions are send below
+*	Also chipselect function is added. Both these functions are sent below
 *	to struct spi_bitbang. See more information in
 *	  /driver/spi/spi_bitbang_txrx.h
 */
@@ -114,33 +115,42 @@ static inline struct spi_kontron  *spidev_to_pp(struct spi_device *spi)
 
 static inline void deassertCS(struct spi_kontron *pp)
 {
-	u8 data = parport_read_data(pp->port);
-	parport_write_data(pp->port, data | nCS);
+	
+	u8 data = pp->lastbyte;
+	data = data | nCS;
+	parport_write_data(pp->port, data);
+	pp->lastbyte=data;
 }
 
 static inline void assertCS(struct spi_kontron *pp)
 {
-	u8 data = parport_read_data(pp->port);
-	parport_write_data(pp->port, data & ~nCS);
+	u8 data = pp->lastbyte;
+	data = data & ~nCS;
+	parport_write_data(pp->port, data);
+	pp->lastbyte=data;
 }
 
 static inline void clkHigh(struct spi_kontron *pp)
 {
-	u8 data = parport_read_data(pp->port);
-	parport_write_data(pp->port, data | SCLK);
+	u8 data = pp->lastbyte;
+	data = data | SCLK;
+	parport_write_data(pp->port, data);
+	pp->lastbyte=data;
 }
 
 static inline void clkLow(struct spi_kontron *pp)
 {
-	u8 data = parport_read_data(pp->port);
-	parport_write_data(pp->port, data & ~SCLK);
+	u8 data = pp->lastbyte;
+	data = data & ~SCLK;
+	parport_write_data(pp->port, data);
+	pp->lastbyte=data;
 }
 
 /*______________________define spi_bitbang inlines___________________________*/
 
 static inline void spidelay(unsigned d)
 {
-	udelay(d);						
+	do{}while(0);						
 }
 
 static inline void setsck(struct spi_device *s, int is_on)
@@ -156,18 +166,21 @@ static inline void setsck(struct spi_device *s, int is_on)
 static inline void setmosi(struct spi_device *s, int is_on)
 {
 	struct spi_kontron *pp = spidev_to_pp(s);
-	u8 data = parport_read_data(pp->port);
+	u8 data = pp->lastbyte;
 	/*deb*/countMOSI++;
 	data=data & ~nCS;  /* mcp2515 do anything only with low chiselect*/
 
 	if (is_on)
 	{
-		parport_write_data(pp->port, data | MOSI);
+		data=data| MOSI;
+		parport_write_data(pp->port, data );
 	}
 	else
-	{	
+	{
+		data=data& ~MOSI;	
 		parport_write_data(pp->port, data & ~MOSI);
 	}
+	pp->lastbyte=data;	
 }
 
 /*			
@@ -256,6 +269,7 @@ static void spi_kontron_attach(struct parport *p)
 	 * Parport hookup
 	 */
 	pp->port = p;
+
 	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,0, pp); 
 	if (!pd)
 	{
@@ -325,7 +339,7 @@ static void spi_kontron_attach(struct parport *p)
 
 	/* power up the chip */
 	parport_write_data(pp->port, kontron_INIT);
-
+	pp->lastbyte=kontron_INIT;
 	/* Enable access to our primary data structure via
 	 * the board info's (void *)controller_data.
 	 */

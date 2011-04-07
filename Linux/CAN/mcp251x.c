@@ -76,6 +76,7 @@
 #include <linux/spi/spi.h>
 #include <linux/uaccess.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
 #define INSTRUCTION_READ	0x03
@@ -784,9 +785,9 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 	struct mcp251x_priv *priv = dev_id;
 	struct spi_device *spi = priv->spi;
 	struct net_device *net = priv->net;
-
 	mutex_lock(&priv->mcp_lock);
 	while (!priv->force_quit) {
+		
 		enum can_state new_state;
 		u8 intf, eflag;
 		u8 clear_intf = 0;
@@ -902,8 +903,10 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 				priv->tx_len = 0;
 			}
 			netif_wake_queue(net);
+			break;
 		}
 
+	
 	}
 	mutex_unlock(&priv->mcp_lock);
 	return 0;
@@ -917,7 +920,7 @@ static int pollingthread(void *data)
 	while(1)
 	{
 
-		msleep(5);
+		udelay(70);
 		mcp251x_can_ist(priv);
 		if(kthread_should_stop())
 		{

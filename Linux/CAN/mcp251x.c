@@ -626,6 +626,8 @@ static void mcp251x_open_clean(struct net_device *net)
 	struct spi_device *spi = priv->spi;
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 
+	priv->platform_data->flag=1;
+	wake_up_interruptible(&priv->platform_data->wait_queue);
 	kthread_stop(poll_struct);
 	mcp251x_hw_sleep(spi);
 	if (pdata->transceiver_enable)
@@ -642,6 +644,9 @@ static int mcp251x_stop(struct net_device *net)
 	close_candev(net);
 
 	priv->force_quit = 1;
+
+	priv->platform_data->flag=1;
+	wake_up_interruptible(&priv->platform_data->wait_queue);
 	kthread_stop(poll_struct);
 	destroy_workqueue(priv->wq);
 	priv->wq = NULL;
@@ -885,17 +890,20 @@ static int pollingthread(void *data)
 	while(1)
 	{
 
-		/*udelay( 70);*/
+
 		wait_event_interruptible(priv->platform_data->wait_queue,
 					priv->platform_data->flag==1);
-		mcp251x_can_ist(priv);
 		priv->platform_data->flag=0;
+
+		/* We should be sure that kthread_stop is called so
+		   we yield processor for other threads */
+		yield();
+
 		if(kthread_should_stop())
 		{
 			break;
 		}
-
-
+		mcp251x_can_ist(priv);
 	}
 
 
@@ -1101,6 +1109,7 @@ static int __devexit mcp251x_can_remove(struct spi_device *spi)
 	struct mcp251x_priv *priv = dev_get_drvdata(&spi->dev);
 	struct net_device *net = priv->net;
 
+
 	unregister_candev(net);
 	free_candev(net);
 
@@ -1126,6 +1135,8 @@ static int mcp251x_can_suspend(struct spi_device *spi, pm_message_t state)
 	struct net_device *net = priv->net;
 
 	priv->force_quit = 1;
+	priv->platform_data->flag=1;
+	wake_up_interruptible(&priv->platform_data->wait_queue);
 	kthread_stop(poll_struct);
 	/*
 	 * Note: at this point neither IST nor workqueues are running.
@@ -1219,6 +1230,7 @@ module_init(mcp251x_can_init);
 module_exit(mcp251x_can_exit);
 
 MODULE_AUTHOR("Chris Elston <celston@katalix.com>, "
-	      "Christian Pellegrin <chripell@evolware.org>");
+	      "Christian Pellegrin <chripell@evolware.org>,  "
+	      "Alyautdin Roman 				     ");
 MODULE_DESCRIPTION("Microchip 251x CAN driver");
 MODULE_LICENSE("GPL v2");

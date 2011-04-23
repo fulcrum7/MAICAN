@@ -1,10 +1,22 @@
 /*
-*	This code is strongly coupled with Linux main line code and uses much
-*	from other spi master drivers. All kernel style comments and GPL links
-*       will be added soon. Also "title"-style comments will be used in project.
-*	
-**/
-
+ * spi_kontron.c - driver for kontron board for the mcp2515 chip
+ *
+ * Copyright (C) 2011 Alyautdin R.T.
+ * Based on spi_lm70llp.c
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -83,15 +95,16 @@ static struct spi_kontron *pkontron;
 #define MOSI		0x01	 	 		
 
 /* This structure is used by mcp251x driver */
-static struct mcp251x_platform_data mcp251x_info;       
+static struct mcp251x_platform_data mcp251x_info;   
+    
 /******************************************************************************
 *			Module IRQ handler
 ******************************************************************************/
+
 void irq_handler(void * param)
 {
 		mcp251x_info.flag=1;
-		wake_up_interruptible(&mcp251x_info.wait_queue);
-		
+		wake_up_interruptible(&mcp251x_info.wait_queue);		
 		countIRQ++;
 }
 /******************************************************************************

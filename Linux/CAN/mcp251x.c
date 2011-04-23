@@ -1,22 +1,8 @@
 /*
  * CAN bus driver for Microchip 251x CAN Controller with SPI Interface
- *
- * MCP2510 support and bug fixes by Christian Pellegrin
- * <chripell@evolware.org>
- *
- * Copyright 2009 Christian Pellegrin EVOL S.r.l.
- *
- * Copyright 2007 Raymarine UK, Ltd. All Rights Reserved.
- * Written under contract by:
- *   Chris Elston, Katalix Systems, Ltd.
- *
- * Based on Microchip MCP251x CAN controller driver written by
- * David Vrabel, Copyright 2006 Arcom Control Systems Ltd.
- *
- * Based on CAN bus driver for the CCAN controller written by
- * - Sascha Hauer, Marc Kleine-Budde, Pengutronix
- * - Simon Kallweit, intefo AG
- * Copyright 2007
+ * 
+ * Copyright (C) 2011 Alyautdin R.T.
+ * Based on mcp251x driver
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the version 2 of the GNU General Public License
@@ -30,31 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *
- *
- * Your platform definition file should specify something like:
- *
- * static struct mcp251x_platform_data mcp251x_info = {
- *         .oscillator_frequency = 8000000,
- *         .board_specific_setup = &mcp251x_setup,
- *         .power_enable = mcp251x_power_enable,
- *         .transceiver_enable = NULL,
- * };
- *
- * static struct spi_board_info spi_board_info[] = {
- *         {
- *                 .modalias = "mcp2510",
- *			// or "mcp2515" depending on your controller
- *                 .platform_data = &mcp251x_info,
- *                 .irq = IRQ_EINT13,
- *                 .max_speed_hz = 2*1000*1000,
- *                 .chip_select = 2,
- *         },
- * };
- *
- * Please see mcp251x.h for a description of the fields in
- * struct mcp251x_platform_data.
  *
  */
 
@@ -77,6 +38,8 @@
 #include <linux/uaccess.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
 /* SPI interface instruction set */
 #define INSTRUCTION_WRITE	0x02
 #define INSTRUCTION_READ	0x03
@@ -254,11 +217,13 @@ struct mcp251x_priv {
 
 	int force_quit;
 	int after_suspend;
+	struct mcp251x_platform_data * platform_data;
 #define AFTER_SUSPEND_UP 1
 #define AFTER_SUSPEND_DOWN 2
 #define AFTER_SUSPEND_POWER 4
 #define AFTER_SUSPEND_RESTART 8
 	int restart_tx;
+
 };
 
 #define MCP251X_IS(_model) \
@@ -920,8 +885,11 @@ static int pollingthread(void *data)
 	while(1)
 	{
 
-		udelay( 70);
+		/*udelay( 70);*/
+		wait_event_interruptible(priv->platform_data->wait_queue,
+					priv->platform_data->flag==1);
 		mcp251x_can_ist(priv);
+		priv->platform_data->flag=0;
 		if(kthread_should_stop())
 		{
 			break;
@@ -1028,6 +996,7 @@ static int __devinit mcp251x_can_probe(struct spi_device *spi)
 	net->flags |= IFF_ECHO;
 
 	priv = netdev_priv(net);
+	priv->platform_data=pdata;
 	priv->can.bittiming_const = &mcp251x_bittiming_const;
 	priv->can.do_set_mode = mcp251x_do_set_mode;
 	priv->can.clock.freq = pdata->oscillator_frequency / 2;

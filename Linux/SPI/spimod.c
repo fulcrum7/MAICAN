@@ -16,8 +16,8 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_bitbang.h>
 #include <linux/can/platform/mcp251x.h> //specific for mcp 
-
-
+#include <linux/wait.h>			// for wait_queues
+#include <linux/sched.h>
 
 
 
@@ -30,6 +30,9 @@ MODULE_AUTHOR("Alyautdin R.T.");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Spi contoller driver for mcp2515");
 
+
+
+
 /******************************************************************************
 *			Module PROC for debugging
 ******************************************************************************/
@@ -40,6 +43,7 @@ unsigned long countTX=0;
 unsigned long countCS=0;
 unsigned long countMOSI=0;
 unsigned long countMISO=0;
+unsigned long countIRQ=0;
 #define PROC_NAME "spi_kontron"
 int procfile_read(char *buf, char **start,
 		  off_t offset,int count,int *eof, void *data)
@@ -47,8 +51,9 @@ int procfile_read(char *buf, char **start,
 	int len;
 	printk(KERN_ALERT "PROC is called");
 	len=sprintf(buf,"Jiffies=%lu\nCountTx=%lu\nCountCS=%lu\n"
-			"CountMOSI=%lu\nCountMISO=%lu\n",
-			jiffies,countTX,countCS,countMOSI,countMISO);
+			"CountMOSI=%lu\nCountMISO=%lu\n"
+			"CountIRQ=%lu\n",
+			jiffies,countTX,countCS,countMOSI,countMISO,countIRQ);
 	*eof=1;
 	return len;
 }
@@ -79,7 +84,16 @@ static struct spi_kontron *pkontron;
 
 /* This structure is used by mcp251x driver */
 static struct mcp251x_platform_data mcp251x_info;       
-
+/******************************************************************************
+*			Module IRQ handler
+******************************************************************************/
+void irq_handler(void * param)
+{
+		mcp251x_info.flag=1;
+		wake_up_interruptible(&mcp251x_info.wait_queue);
+		
+		countIRQ++;
+}
 /******************************************************************************
 *			Module FUNCTIONS FOR SPI_BITBANG 
 ******************************************************************************/
@@ -269,8 +283,9 @@ static void spi_kontron_attach(struct parport *p)
 	 * Parport hookup
 	 */
 	pp->port = p;
-
-	pd = parport_register_device(p, DRVNAME,NULL, NULL, NULL,0, pp); 
+	parport_enable_irq(p);
+	printk(KERN_ALERT "%s: irq=%d",DRVNAME,p->irq);
+	pd = parport_register_device(p, DRVNAME,NULL, NULL, irq_handler,0, pp); 
 	if (!pd)
 	{
 		status = -ENOMEM;
@@ -297,7 +312,9 @@ static void spi_kontron_attach(struct parport *p)
 		parport_unregister_device(pd);
 		(void) spi_master_put(master);
 		return;
-	}	
+	}
+
+	parport_enable_irq(p);	
 
 	/*
 	 * Start SPI ...
@@ -328,7 +345,8 @@ static void spi_kontron_attach(struct parport *p)
 
 	/* This is used by mcp251x driver */
 	mcp251x_info.oscillator_frequency=16000000; 
-
+	init_waitqueue_head(&mcp251x_info.wait_queue);
+	mcp251x_info.flag=0;
 	strcpy(pp->info.modalias, "mcp2515");			
 	pp->info.max_speed_hz =  10*1000*1000;		    
 	pp->info.chip_select = 0;				

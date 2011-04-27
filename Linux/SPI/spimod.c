@@ -103,7 +103,7 @@ static struct mcp251x_platform_data mcp251x_info;
 
 void irq_handler(void * param)
 {
-		mcp251x_info.flag=1;
+		mcp251x_info.flag=WAKE_UP_FLAG;
 		wake_up_interruptible(&mcp251x_info.wait_queue);		
 		countIRQ++;
 }
@@ -359,7 +359,7 @@ static void spi_kontron_attach(struct parport *p)
 	/* This is used by mcp251x driver */
 	mcp251x_info.oscillator_frequency=16000000; 
 	init_waitqueue_head(&mcp251x_info.wait_queue);
-	mcp251x_info.flag=0;
+	mcp251x_info.flag=SLEEPING_FLAG;
 	strcpy(pp->info.modalias, "mcp2515");			
 	pp->info.max_speed_hz =  10*1000*1000;		    
 	pp->info.chip_select = 0;				

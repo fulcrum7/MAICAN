@@ -507,10 +507,12 @@ static int mcp251x_set_normal_mode(struct spi_device *spi)
 	unsigned long timeout;
 
 	/* Enable interrupts */
-	mcp251x_write_reg(spi, CANINTE,
+/*	mcp251x_write_reg(spi, CANINTE,
+			  CANINTE_ERRIE | CANINTE_TX2IE | CANINTE_TX1IE |
+			  CANINTE_TX0IE | CANINTE_RX1IE | CANINTE_RX0IE);*/
+	mcp251x_write_reg(spi, CANINTE,CANINTE_MERRE| CANINTE_WAKIE |
 			  CANINTE_ERRIE | CANINTE_TX2IE | CANINTE_TX1IE |
 			  CANINTE_TX0IE | CANINTE_RX1IE | CANINTE_RX0IE);
-
 	if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
 		/* Put device into loopback mode */
 		mcp251x_write_reg(spi, CANCTRL, CANCTRL_REQOP_LOOPBACK);
@@ -626,8 +628,7 @@ static void mcp251x_open_clean(struct net_device *net)
 	struct spi_device *spi = priv->spi;
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 
-	priv->platform_data->flag=1;
-	wake_up_interruptible(&priv->platform_data->wait_queue);
+
 	kthread_stop(poll_struct);
 	mcp251x_hw_sleep(spi);
 	if (pdata->transceiver_enable)
@@ -640,13 +641,22 @@ static int mcp251x_stop(struct net_device *net)
 	struct mcp251x_priv *priv = netdev_priv(net);
 	struct spi_device *spi = priv->spi;
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
+			u8 deb_efag=0,intf=0;
+			u8 eflag=0;
 
+
+
+		deb_efag=mcp251x_read_reg(spi,CANINTE);
+		printk(KERN_ALERT "MCP: CLOSE FLAG E=%02x",deb_efag);
+		intf=mcp251x_read_reg(spi,CANINTF);
+		printk(KERN_ALERT "MCP: CLOSE FLAG F=%02x",intf);
+		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
+		printk(KERN_ALERT "MCP: CLOSE FLAG F=%02x Ef=%02x",intf,eflag);	
 	close_candev(net);
 
 	priv->force_quit = 1;
 
-	priv->platform_data->flag=1;
-	wake_up_interruptible(&priv->platform_data->wait_queue);
+
 	kthread_stop(poll_struct);
 	destroy_workqueue(priv->wq);
 	priv->wq = NULL;
@@ -762,9 +772,10 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 		u8 intf, eflag;
 		u8 clear_intf = 0;
 		int can_id = 0, data1 = 0;
-
+		u8 deb_efag=0;
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
-
+		deb_efag=mcp251x_read_reg(spi,CANINTE);
+		printk(KERN_ALERT "MCP: FLAG F=%02x FLAG E=%02x",intf,deb_efag);
 		/* mask out flags we don't care about */
 		intf &= CANINTF_RX | CANINTF_TX | CANINTF_ERR;
 
@@ -886,24 +897,26 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 static int pollingthread(void *data)
 {
 	struct mcp251x_priv *priv=(struct mcp251x_priv *)data;
-
+	unsigned long counter=0;
 	while(1)
 	{
 
 
 		wait_event_interruptible(priv->platform_data->wait_queue,
-					priv->platform_data->flag==1);
-		priv->platform_data->flag=0;
-
-		/* We should be sure that kthread_stop is called so
-		   we yield processor for other threads */
-		yield();
-
+					priv->platform_data->flag==WAKE_UP_FLAG
+					|| kthread_should_stop());
+		counter++;
 		if(kthread_should_stop())
 		{
+			printk(KERN_ALERT "mcp251x: Polling thread is stopped");
+			printk(KERN_ALERT "mcp251x: Counter=%lu",counter-1);
 			break;
+			
 		}
+		disable_irq(priv->spi->irq);
+		priv->platform_data->flag=SLEEPING_FLAG;
 		mcp251x_can_ist(priv);
+		enable_irq(priv->spi->irq);
 	}
 
 
@@ -935,7 +948,7 @@ static int mcp251x_open(struct net_device *net)
 
 	if(poll_struct>0)
 	{
-		printk(KERN_WARNING "MCP251x: Polling started");
+		printk(KERN_WARNING "mcp251x: Polling started");
 
 	}
 	else
@@ -1135,8 +1148,7 @@ static int mcp251x_can_suspend(struct spi_device *spi, pm_message_t state)
 	struct net_device *net = priv->net;
 
 	priv->force_quit = 1;
-	priv->platform_data->flag=1;
-	wake_up_interruptible(&priv->platform_data->wait_queue);
+
 	kthread_stop(poll_struct);
 	/*
 	 * Note: at this point neither IST nor workqueues are running.

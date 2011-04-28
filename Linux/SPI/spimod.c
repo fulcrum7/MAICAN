@@ -88,7 +88,7 @@ struct spi_kontron {
 static struct spi_kontron *pkontron;
 
 /* Wiring information. See datasheet for details */
-#define kontron_INIT	0xFF				
+#define kontron_INIT	0x08				
 #define MISO		PARPORT_STATUS_BUSY		
 #define nCS		0x04				
 #define SCLK		0x02				
@@ -364,12 +364,12 @@ static void spi_kontron_attach(struct parport *p)
 	pp->info.max_speed_hz =  10*1000*1000;		    
 	pp->info.chip_select = 0;				
 	pp->info.mode = SPI_MODE_0;  		
-
+	pp->info.irq=p->irq;
 	pp->info.platform_data=&mcp251x_info; 
 
 
 	/* power up the chip */
-	parport_write_data(pp->port, kontron_INIT);
+	parport_write_data(pp->port, ~kontron_INIT);
 	pp->lastbyte=kontron_INIT;
 	/* Enable access to our primary data structure via
 	 * the board info's (void *)controller_data.
@@ -392,7 +392,7 @@ static void spi_kontron_attach(struct parport *p)
 			DRVNAME, status);
 		
 		/* power down */
-		parport_write_data(pp->port, 0x08);        /*REVISIT*/
+		parport_write_data(pp->port, ~kontron_INIT);        /*REVISIT*/
 		mdelay(10);
 		parport_release(pp->pd);
 		parport_unregister_device(pd);
@@ -418,7 +418,7 @@ static void spi_kontron_detach(struct parport *p)
 	spi_bitbang_stop(&pp->bitbang);
 
 	/* power down */
-	parport_write_data(pp->port, 0x08);                  /*REVISIT*/
+	parport_write_data(pp->port, ~kontron_INIT);                 /*REVISIT*/
 
 	parport_release(pp->pd);
 	parport_unregister_device(pp->pd);

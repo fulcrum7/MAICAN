@@ -22,6 +22,10 @@
  *
  */
 
+#define SLEEPING_FLAG 		0x00
+#define WAKE_UP_FLAG 		0x01
+
+
 struct mcp251x_platform_data {
 	unsigned long oscillator_frequency;
 	int (*board_specific_setup)(struct spi_device *spi);

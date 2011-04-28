@@ -507,13 +507,10 @@ static int mcp251x_set_normal_mode(struct spi_device *spi)
 	unsigned long timeout;
 
 	/* Enable interrupts */
-/*	mcp251x_write_reg(spi, CANINTE,
-			  CANINTE_ERRIE | CANINTE_TX2IE | CANINTE_TX1IE |
-			  CANINTE_TX0IE | CANINTE_RX1IE | CANINTE_RX0IE);*/
-	mcp251x_write_reg(spi, CANINTE,CANINTE_MERRE| CANINTE_WAKIE |
+	mcp251x_write_reg(spi, CANINTE,
 			  CANINTE_ERRIE | CANINTE_TX2IE | CANINTE_TX1IE |
 			  CANINTE_TX0IE | CANINTE_RX1IE | CANINTE_RX0IE);
-	if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
+		if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
 		/* Put device into loopback mode */
 		mcp251x_write_reg(spi, CANCTRL, CANCTRL_REQOP_LOOPBACK);
 	} else if (priv->can.ctrlmode & CAN_CTRLMODE_LISTENONLY) {
@@ -767,7 +764,7 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 	struct net_device *net = priv->net;
 	mutex_lock(&priv->mcp_lock);
 	while (!priv->force_quit) {
-		
+		 
 		enum can_state new_state;
 		u8 intf, eflag;
 		u8 clear_intf = 0;
@@ -776,6 +773,7 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 		mcp251x_read_2regs(spi, CANINTF, &intf, &eflag);
 		deb_efag=mcp251x_read_reg(spi,CANINTE);
 		printk(KERN_ALERT "MCP: FLAG F=%02x FLAG E=%02x",intf,deb_efag);
+		
 		/* mask out flags we don't care about */
 		intf &= CANINTF_RX | CANINTF_TX | CANINTF_ERR;
 
@@ -787,7 +785,10 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 			 * (The MCP2515 does this automatically.)
 			 */
 			if (mcp251x_is_2510(spi))
+			{
+				printk(KERN_ALERT "MCP: MCP2510!!!");
 				mcp251x_write_bits(spi, CANINTF, CANINTF_RX0IF, 0x00);
+			}
 		}
 
 		/* receive buffer 1 */
@@ -795,7 +796,8 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 			mcp251x_hw_rx(spi, 1);
 			/* the MCP2515 does this automatically */
 			if (mcp251x_is_2510(spi))
-				clear_intf |= CANINTF_RX1IF;
+				printk(KERN_ALERT "MCP: MCP2510!!!");
+				//clear_intf |= CANINTF_RX1IF;
 		}
 
 		/* any error or tx interrupt we need to clear? */
@@ -872,7 +874,7 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 				break;
 			}
 		}
-
+		
 		if (intf == 0)
 			break;
 
@@ -884,8 +886,9 @@ static int mcp251x_can_ist(struct mcp251x_priv  *dev_id)
 				priv->tx_len = 0;
 			}
 			netif_wake_queue(net);
-			break;
+ 
 		}
+
 
 	
 	}
@@ -916,6 +919,7 @@ static int pollingthread(void *data)
 		disable_irq(priv->spi->irq);
 		priv->platform_data->flag=SLEEPING_FLAG;
 		mcp251x_can_ist(priv);
+		printk(KERN_ALERT "IRQ=%d",priv->spi->irq);
 		enable_irq(priv->spi->irq);
 	}
 
@@ -942,6 +946,7 @@ static int mcp251x_open(struct net_device *net)
 		pdata->transceiver_enable(1);
 
 	priv->force_quit = 0;
+	/**/
 	priv->tx_skb = NULL;
 	priv->tx_len = 0;
 	poll_struct=kthread_run(pollingthread,priv,"polling_thread");
